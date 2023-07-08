@@ -315,10 +315,49 @@ void apply_config(const ConfigTree &cfg) {
 
 		// Translation / localization
 		Common::String translation;
-		if (ConfMan.getActiveDomain()->tryGetVal("translation", translation) && !translation.empty())
-			_GP(usetup).translation = translation;
-		else
-			_GP(usetup).translation = CfgReadString(cfg, "language", "translation");
+		const Common::String config_language = ConfMan.get("language");
+		if (!config_language.empty()) {
+			const static char *translation_fr[] = { "french", "francais", "français", 0 };
+			const static char *translation_de[] = { "german", "deutsch", 0 };
+			const static char *translation_hu[] = { "hungarian", 0 };
+			const static char *translation_it[] = { "italian", 0 };
+			const static char *translation_sp[] = { "spanish", 0 };
+			const static char *translation_tr[] = { "turkish", 0 };
+			const static struct {
+				const char *language;
+				const char **translation;
+			} language_to_translation[] = {
+				{ "fr", translation_fr },
+				{ "de", translation_de },
+				{ "hu", translation_hu },
+				{ "it", translation_it },
+				{ "sp", translation_sp },
+				{ "tr", translation_tr },
+				{ 0, NULL }
+			};
+
+			for (int i=0; language_to_translation[i].language; i++) {
+				if (config_language == language_to_translation[i].language) {
+					Common::String path = ConfMan.get("path", ConfMan.getActiveDomainName());
+					Common::FSDirectory dir(path);
+					Common::ArchiveMemberList traFileList;
+					for (int j=0; language_to_translation[i].translation[j]; j++) {
+						dir.listMatchingMembers(traFileList, (Common::String) "*" + language_to_translation[i].translation[j] + "*.tra");
+						if (!traFileList.empty()) {
+							translation = traFileList.front()->getName();
+							translation.erase(translation.size() - 4);
+							break;
+						}
+					}
+					break;
+				}
+			}
+		}
+		if (translation.empty()) {
+			if (!ConfMan.getActiveDomain()->tryGetVal("translation", translation) || translation.empty())
+				translation = CfgReadString(cfg, "language", "translation").GetCStr();
+		}
+		_GP(usetup).translation = translation;
 
 		// Resource caches and options
 		_GP(usetup).clear_cache_on_room_change = CfgReadBoolInt(cfg, "misc", "clear_cache_on_room_change", _GP(usetup).clear_cache_on_room_change);
